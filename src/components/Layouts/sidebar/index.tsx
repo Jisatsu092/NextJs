@@ -4,26 +4,43 @@ import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getNavData } from "./data";
 import { ArrowLeftIcon, ChevronUp } from "./icons";
 import { MenuItem } from "./menu-item";
 import { useSidebarContext } from "./sidebar-context";
 import { useAuth } from "@/hooks/use-auth";
 
+// Define types for navigation data
+interface SubItem {
+  title: string;
+  url: string;
+}
+
+interface NavItem {
+  title: string;
+  url?: string;
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  items?: SubItem[];
+}
+
+interface Section {
+  label: string;
+  items: NavItem[];
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { setIsOpen, isOpen, isMobile, toggleSidebar } = useSidebarContext();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const isLoggedIn = useAuth();
-  const navigationData = getNavData(isLoggedIn);
+  const navigationData: Section[] = getNavData(isLoggedIn);
 
-  const toggleExpanded = (title: string) => {
+  const toggleExpanded = useCallback((title: string) => {
     setExpandedItems((prev) => (prev.includes(title) ? [] : [title]));
-  };
+  }, []);
 
   useEffect(() => {
-    // Keep collapsible open when subpage is active
     navigationData.some((section) => {
       return section.items.some((item) => {
         return item.items?.some((subItem) => {
@@ -37,7 +54,7 @@ export function Sidebar() {
         });
       });
     });
-  }, [pathname, navigationData]);
+  }, [pathname, navigationData, toggleExpanded, expandedItems]);
 
   return (
     <>
@@ -52,7 +69,7 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          "max-w-[290px] overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 ease-linear dark:border-gray-800 dark:bg-gray-dark",
+          "max-w-[290px] overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 ease-linear dark:border-gray-800 dark:bg-gray-900",
           isMobile ? "fixed bottom-0 top-0 z-50" : "sticky top-0 h-screen",
           isOpen ? "w-full" : "w-0"
         )}
@@ -65,7 +82,7 @@ export function Sidebar() {
             <Link
               href={"/"}
               onClick={() => isMobile && toggleSidebar()}
-              className="px-0 py-2.5 min-[850px]:py-0"
+              className="px-0 py-2.5 sm:py-0"
             >
               <Logo />
             </Link>
@@ -82,10 +99,10 @@ export function Sidebar() {
           </div>
 
           {/* Navigation */}
-          <div className="custom-scrollbar mt-6 flex-1 overflow-y-auto pr-3 min-[850px]:mt-10">
+          <div className="mt-6 flex-1 overflow-y-auto pr-3 sm:mt-10">
             {navigationData.map((section) => (
               <div key={section.label} className="mb-6">
-                <h2 className="mb-5 text-sm font-medium text-dark-4 dark:text-dark-6">
+                <h2 className="mb-5 text-sm font-medium text-gray-600 dark:text-gray-400">
                   {section.label}
                 </h2>
 
@@ -102,17 +119,17 @@ export function Sidebar() {
                               onClick={() => toggleExpanded(item.title)}
                               className="flex items-center gap-3 py-3"
                             >
-                              <item.icon
-                                className="size-6 shrink-0"
-                                aria-hidden="true"
-                              />
-
+                              {item.icon && (
+                                <item.icon
+                                  className="size-6 shrink-0"
+                                  aria-hidden="true"
+                                />
+                              )}
                               <span>{item.title}</span>
-
                               <ChevronUp
                                 className={cn(
                                   "ml-auto rotate-180 transition-transform duration-200",
-                                  expandedItems.includes(item.title) && "rotate-0"
+                                  expandedItems.includes(item.title) ? "rotate-0" : ""
                                 )}
                                 aria-hidden="true"
                               />
@@ -120,7 +137,7 @@ export function Sidebar() {
 
                             {expandedItems.includes(item.title) && (
                               <ul
-                                className="ml-9 mr-0 space-y-1.5 pb-[15px] pr-0 pt-2"
+                                className="ml-9 mr-0 space-y-1.5 pb-4 pr-0 pt-2"
                                 role="menu"
                               >
                                 {item.items.map((subItem) => (
@@ -140,11 +157,7 @@ export function Sidebar() {
                           </div>
                         ) : (
                           (() => {
-                            const href =
-                              "url" in item
-                                ? item.url
-                                : "/" +
-                                  item.title.toLowerCase().split(" ").join("-");
+                            const href = item.url ?? "/" + item.title.toLowerCase().split(" ").join("-");
 
                             return (
                               <MenuItem
@@ -153,11 +166,12 @@ export function Sidebar() {
                                 href={href}
                                 isActive={pathname === href}
                               >
-                                <item.icon
-                                  className="size-6 shrink-0"
-                                  aria-hidden="true"
-                                />
-
+                                {item.icon && (
+                                  <item.icon
+                                    className="size-6 shrink-0"
+                                    aria-hidden="true"
+                                  />
+                                )}
                                 <span>{item.title}</span>
                               </MenuItem>
                             );

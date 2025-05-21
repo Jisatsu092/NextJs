@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import { standardFormat } from "@/lib/format-number";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useRouter } from "next/navigation";
@@ -52,20 +52,19 @@ export function Bookings({ className }: { className?: string }) {
   const [formData, setFormData] = useState({
     bookingDate: new Date(),
     roomId: "",
-    userId: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const getAccessToken = () => {
+  const getAccessToken = useCallback(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
       router.push("/auth/sign-in");
       throw new Error("Session expired");
     }
     return token;
-  };
+  }, [router]);
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       const token = getAccessToken();
       const res = await fetch(`${BASE_URL}/bookings`, {
@@ -77,9 +76,9 @@ export function Bookings({ className }: { className?: string }) {
     } catch (err: any) {
       setError(err.message);
     }
-  };
+  }, [getAccessToken]);
 
-  const fetchRooms = async () => {
+  const fetchRooms = useCallback(async () => {
     try {
       const token = getAccessToken();
       const res = await fetch(`${BASE_URL}/rooms`, {
@@ -91,13 +90,13 @@ export function Bookings({ className }: { className?: string }) {
     } catch (err: any) {
       setError(err.message);
     }
-  };
+  }, [getAccessToken]);
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     setLoading(true);
     await fetchBookings();
     setLoading(false);
-  };
+  }, [fetchBookings]);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Apakah Anda yakin ingin menghapus booking ini?")) return;
@@ -129,18 +128,22 @@ export function Bookings({ className }: { className?: string }) {
       await Promise.all([fetchBookings(), fetchRooms()]);
       setLoading(false);
     })();
-  }, []);
+  }, [fetchBookings, fetchRooms]);
 
   const resetForm = () => {
     setCurrentBooking(null);
-    setFormData({ bookingDate: new Date(), roomId: "", userId: "" });
+    setFormData({ bookingDate: new Date(), roomId: "" });
     setError(null);
+  };
+
+  const generateRandomUserId = () => {
+    return Math.floor(Math.random() * 1000) + 1; // Menghasilkan angka acak antara 1 dan 1000
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.roomId || !formData.bookingDate || !formData.userId) {
+    if (!formData.roomId || !formData.bookingDate) {
       toast.error("Semua field harus diisi");
       return;
     }
@@ -149,7 +152,7 @@ export function Bookings({ className }: { className?: string }) {
 
     const payload = {
       roomId: Number(formData.roomId),
-      userId: Number(formData.userId),
+      userId: currentBooking?.user?.id ?? generateRandomUserId(), // Gunakan userId yang ada atau buat baru
       bookingDate: formData.bookingDate.toISOString().split("T")[0],
     };
 
@@ -179,7 +182,6 @@ export function Bookings({ className }: { className?: string }) {
         throw new Error(msg);
       }
 
-      const result = JSON.parse(raw);
       toast.success(
         currentBooking ? "Booking berhasil diperbarui" : "Booking berhasil dibuat"
       );
@@ -233,7 +235,6 @@ export function Bookings({ className }: { className?: string }) {
                     setFormData({
                       bookingDate: new Date(b.bookingDate),
                       roomId: b.roomId.toString(),
-                      userId: b.user?.id?.toString() || "",
                     });
                     setModalOpen(true);
                   }}
@@ -264,23 +265,14 @@ export function Bookings({ className }: { className?: string }) {
                 <label className="block mb-1">Tanggal Booking</label>
                 <DatePicker
                   selected={formData.bookingDate}
-                  onChange={(d: Date) =>
-                    setFormData((f) => ({ ...f, bookingDate: d }))
+                  onChange={(d: Date | null) =>
+                    setFormData((f) => ({
+                      ...f,
+                      bookingDate: d || new Date(),
+                    }))
                   }
                   dateFormat="yyyy-MM-dd"
                   className="w-full border px-2 py-1 rounded"
-                />
-              </div>
-              <div>
-                <label className="block mb-1">User ID</label>
-                <input
-                  type="number"
-                  value={formData.userId}
-                  onChange={(e) =>
-                    setFormData((f) => ({ ...f, userId: e.target.value }))
-                  }
-                  className="w-full border px-2 py-1 rounded"
-                  required
                 />
               </div>
               <div>

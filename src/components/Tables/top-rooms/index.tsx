@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 interface Room {
   id: number;
   name: string;
-  categoryId: number;
+  categoryId: string; // Ubah dari number ke string
   price: number;
   capacity: number;
   description: string;
@@ -91,7 +91,6 @@ export function Rooms({ className }: { className?: string }) {
 
   const handleEdit = async (id: number) => {
     try {
-      // Pastikan kategori sudah dimuat
       if (categories.length === 0) {
         await fetchCategories();
       }
@@ -132,17 +131,17 @@ export function Rooms({ className }: { className?: string }) {
     try {
       const roomData = {
         name: formData.name,
-        categoryId: Number(formData.categoryId),
+        categoryId: formData.categoryId, // Tidak perlu konversi ke Number
         price: Number(formData.price),
         capacity: Number(formData.capacity),
         description: formData.description
       };
 
-      if (editRoomId) {
-        await updateRoom(editRoomId, roomData);
-      } else {
-        await createRoom(roomData);
-      }
+      // if (editRoomId) {
+      //   await updateRoom(editRoomId, roomData);
+      // } else {
+      //   await createRoom(roomData);
+      // }
 
       await fetchData();
       setIsModalOpen(false);
@@ -353,7 +352,7 @@ export function Rooms({ className }: { className?: string }) {
             <TableRow key={room.id}>
               <TableCell>{room.name}</TableCell>
               <TableCell>
-                {categories.find(c => c.id === room.categoryId)?.name || 'Memuat...'}
+                {categories.find(c => c.id === Number(room.categoryId))?.name || 'Memuat...'}
               </TableCell>
               <TableCell>Rp{room.price.toLocaleString("id-ID")}</TableCell>
               <TableCell>{room.capacity} orang</TableCell>
