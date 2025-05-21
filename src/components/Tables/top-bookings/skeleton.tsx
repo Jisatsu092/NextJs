@@ -28,7 +28,7 @@ export function TopChannelsSkeleton() {
         </TableHeader>
 
         <TableBody>
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 10 }).map((_, i) => (
             <TableRow key={i}>
               <TableCell colSpan={100}>
                 <Skeleton className="h-8" />

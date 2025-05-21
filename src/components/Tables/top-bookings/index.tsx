@@ -137,7 +137,7 @@ export function Bookings({ className }: { className?: string }) {
   };
 
   const generateRandomUserId = () => {
-    return Math.floor(Math.random() * 1000) + 1; // Menghasilkan angka acak antara 1 dan 1000
+    return Math.floor(Math.random() * 1000) + 1;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -152,7 +152,7 @@ export function Bookings({ className }: { className?: string }) {
 
     const payload = {
       roomId: Number(formData.roomId),
-      userId: currentBooking?.user?.id ?? generateRandomUserId(), // Gunakan userId yang ada atau buat baru
+      userId: currentBooking?.user?.id ?? generateRandomUserId(),
       bookingDate: formData.bookingDate.toISOString().split("T")[0],
     };
 
@@ -195,19 +195,69 @@ export function Bookings({ className }: { className?: string }) {
     }
   };
 
-  if (loading) return <div className="p-4 text-center">Memuat data...</div>;
-  if (error) return <div className="p-4 bg-red-100 text-red-700">{error}</div>;
+  if (loading) {
+    return (
+      <div
+        className={cn(
+          "grid rounded-[10px] bg-white px-7.5 pb-4 pt-7.5 shadow-1 dark:bg-gray-dark dark:shadow-card",
+          className
+        )}
+      >
+        <h2 className="mb-4 text-body-2xlg font-bold text-dark dark:text-white">
+          Daftar Booking
+        </h2>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tanggal</TableHead>
+              <TableHead>Ruangan</TableHead>
+              <TableHead>Aksi</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 100 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell colSpan={3}>
+                  <div className="h-8 bg-gray-200 rounded animate-pulse dark:bg-gray-600"></div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        className={cn(
+          "p-4 rounded-[10px] bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-100",
+          className
+        )}
+      >
+        {error}
+      </div>
+    );
+  }
 
   return (
-    <div className={cn("bg-white p-6 rounded shadow", className)}>
-      <div className="flex justify-between mb-4">
-        <h2 className="text-xl font-bold">Daftar Booking</h2>
+    <div
+      className={cn(
+        "grid rounded-[10px] bg-white px-7.5 pb-4 pt-7.5 shadow-1 dark:bg-gray-dark dark:shadow-card",
+        className
+      )}
+    >
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-body-2xlg font-bold text-dark dark:text-white">
+          Daftar Booking
+        </h2>
         <button
           onClick={() => {
             resetForm();
             setModalOpen(true);
           }}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600"
         >
           Tambah Booking
         </button>
@@ -216,19 +266,21 @@ export function Bookings({ className }: { className?: string }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Tanggal</TableHead>
-            <TableHead>Ruangan</TableHead>
-            <TableHead>Aksi</TableHead>
+            <TableHead className="text-dark dark:text-white">Tanggal</TableHead>
+            <TableHead className="text-dark dark:text-white">Ruangan</TableHead>
+            <TableHead className="text-dark dark:text-white">Aksi</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.map((b) => (
             <TableRow key={b.id}>
-              <TableCell>
+              <TableCell className="text-dark dark:text-white">
                 {new Date(b.bookingDate).toISOString().split("T")[0]}
               </TableCell>
-              <TableCell>{b.room?.name || "-"}</TableCell>
-              <TableCell>
+              <TableCell className="text-dark dark:text-white">
+                {b.room?.name || "-"}
+              </TableCell>
+              <TableCell className="space-x-2">
                 <button
                   onClick={() => {
                     setCurrentBooking(b);
@@ -238,13 +290,13 @@ export function Bookings({ className }: { className?: string }) {
                     });
                     setModalOpen(true);
                   }}
-                  className="text-blue-500 hover:underline"
+                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => handleDelete(b.id)}
-                  className="text-red-500 hover:underline ml-2"
+                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900"
                 >
                   Hapus
                 </button>
@@ -255,14 +307,16 @@ export function Bookings({ className }: { className?: string }) {
       </Table>
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-md">
+            <h3 className="text-lg font-bold mb-4 dark:text-white">
               {currentBooking ? "Edit Booking" : "Buat Booking Baru"}
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block mb-1">Tanggal Booking</label>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-200">
+                  Tanggal Booking
+                </label>
                 <DatePicker
                   selected={formData.bookingDate}
                   onChange={(d: Date | null) =>
@@ -272,17 +326,19 @@ export function Bookings({ className }: { className?: string }) {
                     }))
                   }
                   dateFormat="yyyy-MM-dd"
-                  className="w-full border px-2 py-1 rounded"
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
               </div>
               <div>
-                <label className="block mb-1">Pilih Ruangan</label>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-200">
+                  Pilih Ruangan
+                </label>
                 <select
                   value={formData.roomId}
                   onChange={(e) =>
                     setFormData((f) => ({ ...f, roomId: e.target.value }))
                   }
-                  className="w-full border px-2 py-1 rounded"
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   required
                 >
                   <option value="">-- Pilih --</option>
@@ -293,19 +349,20 @@ export function Bookings({ className }: { className?: string }) {
                   ))}
                 </select>
               </div>
-              {error && <p className="text-red-600">{error}</p>}
-              <div className="flex justify-end space-x-2">
+              {error && <p className="text-red-500 dark:text-red-400 text-sm mt-4">{error}</p>}
+              <div className="flex justify-end gap-2 mt-6">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 bg-gray-300 rounded"
+                  className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-white"
+                  disabled={submitting}
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
                 >
                   {submitting ? "Menyimpan..." : "Simpan"}
                 </button>

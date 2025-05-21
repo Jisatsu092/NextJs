@@ -123,10 +123,15 @@ export async function getTopChannels() {
 interface Room {
   id: number;
   name: string;
-  categoryId: string;
+  categoryId: number; // Changed to number
   price: number;
   capacity: number;
   description: string;
+}
+
+interface Category {
+  id: number;
+  name: string;
 }
 
 interface RoomData {
@@ -137,12 +142,12 @@ interface RoomData {
   description: string;
 }
 
-export async function getRooms(): Promise<Room[]> {
+export async function getRooms(page: number = 1, perPage: number = 10): Promise<{ data: Room[], totalPages: number }> {
   try {
     const accessToken = localStorage.getItem("accessToken");
     if (!accessToken) throw new Error("Token tidak valid");
 
-    const response = await fetch("https://simaru.amisbudi.cloud/api/rooms", {
+    const response = await fetch(`https://simaru.amisbudi.cloud/api/rooms?page=${page}&per_page=${perPage}`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -158,19 +163,21 @@ export async function getRooms(): Promise<Room[]> {
 
     const apiData = await response.json();
 
-    // Validasi struktur response
     if (!apiData.data || !Array.isArray(apiData.data)) {
       throw new Error("Format data tidak valid");
     }
 
-    return apiData.data.map((room: any) => ({
-      id: room.id, // Pastikan ID ada
-      name: room.name || "Unnamed Room",
-      categoryId: room.categoryId.toString(), // Ambil ID kategori
-      price: Number(room.price) || 0,
-      capacity: Number(room.capacity) || 0,
-      description: room.description || "No description",
-    }));
+    return {
+      data: apiData.data.map((room: any) => ({
+        id: Number(room.id),
+        name: room.name || "Unnamed Room",
+        categoryId: Number(room.categoryId), // Ensure it's a number
+        price: Number(room.price) || 0,
+        capacity: Number(room.capacity) || 0,
+        description: room.description || "No description",
+      })),
+      totalPages: apiData.totalPages || Math.ceil(apiData.total / perPage) || 1,
+    };
   } catch (error) {
     console.error("Error fetching rooms:", error);
     throw new Error(
@@ -180,6 +187,81 @@ export async function getRooms(): Promise<Room[]> {
     );
   }
 }
+
+export async function getCategories(): Promise<Category[]> {
+  try {
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) throw new Error("Token tidak valid");
+
+    const response = await fetch("https://simaru.amisbudi.cloud/api/categories", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const apiData = await response.json();
+
+    if (!Array.isArray(apiData)) {
+      throw new Error("Format respons API tidak valid");
+    }
+
+    return apiData.map((category: any) => ({
+      id: Number(category.id), // Ensure id is a number
+      name: category.name || "Unnamed Category",
+    }));
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    let errorMessage = "Gagal memuat kategori";
+    if (error instanceof Error) {
+      errorMessage += ": " + error.message;
+    }
+    throw new Error(errorMessage);
+  }
+}
+
+export async function getRoom(id: number): Promise<Room> {
+  try {
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) throw new Error("Token tidak valid");
+
+    const response = await fetch(`https://simaru.amisbudi.cloud/api/rooms/${id}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.message || `Gagal mengambil data: ${response.status}`
+      );
+    }
+
+    const room = await response.json();
+    return {
+      id: Number(room.id),
+      name: room.name || "Unnamed Room",
+      categoryId: Number(room.categoryId),
+      price: Number(room.price) || 0,
+      capacity: Number(room.capacity) || 0,
+      description: room.description || "No description",
+    };
+  } catch (error) {
+    console.error("Error fetching room:", error);
+    throw new Error(
+      error instanceof Error 
+        ? error.message 
+        : "Terjadi kesalahan saat mengambil data ruangan"
+    );
+  }
+}
+
 export async function createRoom(roomData: {
   name: string;
   categoryId: number;
@@ -238,7 +320,7 @@ export const updateRoom = async (id: number, roomData: RoomData) => {
   }
 };
 
-export const deleteRoom = async (id: number) => {
+export async function deleteRoom(id: number): Promise<void> {
   try {
     const accessToken = localStorage.getItem("accessToken");
     if (!accessToken) throw new Error("Token tidak valid");
@@ -252,75 +334,17 @@ export const deleteRoom = async (id: number) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.message || "Gagal menghapus ruangan");
+      throw new Error(
+        errorData.message || `Gagal menghapus ruangan: ${response.status}`
+      );
     }
-
-    return true;
   } catch (error) {
     console.error("Error deleting room:", error);
-    throw error;
-  }
-};
-
-export const getRoom = async (id: number) => {
-  try {
-    const accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) throw new Error("Token tidak valid");
-
-    const response = await fetch(`https://simaru.amisbudi.cloud/api/rooms/${id}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Gagal mengambil data ruangan");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error fetching room:", error);
-    throw error;
-  }
-};
-
-export async function getCategories() {
-  try {
-    const accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) throw new Error("Token tidak valid");
-
-    const response = await fetch("https://simaru.amisbudi.cloud/api/categories", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const apiData = await response.json();
-
-    if (!Array.isArray(apiData)) {
-      throw new Error("Format respons API tidak valid");
-    }
-
-    return apiData.map((category: any) => ({
-      id: category.id.toString(),
-      name: category.name,
-    }));
-
-  } catch (error) {
-    console.error("Error fetching categories:", error);
-    let errorMessage = "Gagal memuat kategori";
-    if (error instanceof Error) {
-      errorMessage += ": " + error.message;
-    }
-    
-    throw new Error(errorMessage);
+    throw new Error(
+      error instanceof Error 
+        ? error.message 
+        : "Terjadi kesalahan saat menghapus ruangan"
+    );
   }
 }
 

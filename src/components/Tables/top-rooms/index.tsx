@@ -11,11 +11,12 @@ import {
 } from "@/components/ui/table";
 import { getRooms, createRoom, getCategories, updateRoom, deleteRoom, getRoom } from "../fetch";
 import { cn } from "@/lib/utils";
+import toast from "react-hot-toast";
 
 interface Room {
   id: number;
   name: string;
-  categoryId: string; // Ubah dari number ke string
+  categoryId: number;
   price: number;
   capacity: number;
   description: string;
@@ -26,28 +27,124 @@ interface Category {
   name: string;
 }
 
+// Komponen CustomAlert
+const CustomAlert = ({ type, message, onClose }: { type: string; message: string; onClose: () => void }) => {
+  const [isVisible, setIsVisible] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 3000); // Loading selama 3 detik
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  const alertStyles = {
+    info: "text-blue-800 border-blue-300 bg-blue-50 dark:text-blue-400 dark:bg-gray-800 dark:border-blue-800",
+    danger: "text-red-800 border-red-300 bg-red-50 dark:text-red-400 dark:bg-gray-800 dark:border-red-800",
+    success: "text-green-800 border-green-300 bg-green-50 dark:text-green-400 dark:bg-gray-800 dark:border-green-800",
+    warning: "text-yellow-800 border-yellow-300 bg-yellow-50 dark:text-yellow-300 dark:bg-gray-800 dark:border-yellow-800",
+    dark: "text-gray-800 border-gray-300 bg-gray-50 dark:text-gray-300 dark:bg-gray-800 dark:border-gray-600",
+  };
+
+  const buttonStyles = {
+    info: "bg-blue-50 text-blue-500 hover:bg-blue-200 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700",
+    danger: "bg-red-50 text-red-500 hover:bg-red-200 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700",
+    success: "bg-green-50 text-green-500 hover:bg-green-200 dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700",
+    warning: "bg-yellow-50 text-yellow-500 hover:bg-yellow-200 dark:bg-gray-800 dark:text-yellow-300 dark:hover:bg-gray-700",
+    dark: "bg-gray-50 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700",
+  };
+
+  return (
+    <div
+      id={`alert-border-${type}`}
+      className={cn(
+        "flex items-center p-4 mb-4 border-t-4 transition-transform duration-500 ease-in-out relative",
+        alertStyles[type as keyof typeof alertStyles],
+        isVisible ? "translate-x-0" : "translate-x-full"
+      )}
+      role="alert"
+    >
+      {isLoading && (
+        <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 animate-pulse" />
+      )}
+      <svg
+        className="shrink-0 w-4 h-4"
+        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+      >
+        <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z" />
+      </svg>
+      <div className="ms-3 text-sm font-medium">
+        {message}{" "}
+        <a href="#" className="font-semibold underline hover:no-underline">
+          example link
+        </a>
+        . Give it a click if you like.
+      </div>
+      <button
+        type="button"
+        className={cn(
+          "ms-auto -mx-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5 hover:bg-blue-200 inline-flex items-center justify-center h-8 w-8",
+          buttonStyles[type as keyof typeof buttonStyles]
+        )}
+        onClick={() => {
+          setIsVisible(false);
+          setTimeout(onClose, 500); // Menunggu animasi selesai sebelum menutup
+        }}
+        aria-label="Close"
+      >
+        <span className="sr-only">Dismiss</span>
+        <svg
+          className="w-3 h-3"
+          aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 14 14"
+        >
+          <path
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
+          />
+        </svg>
+      </button>
+    </div>
+  );
+};
+
+// Komponen Rooms
 export function Rooms({ className }: { className?: string }) {
   const [data, setData] = useState<Room[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    categoryId: '',
-    price: '',
-    capacity: '',
-    description: ''
+    name: "",
+    categoryId: "",
+    price: "",
+    capacity: "",
+    description: "",
   });
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
-  const [categoriesError, setCategoriesError] = useState('');
+  const [categoriesError, setCategoriesError] = useState("");
   const [editRoomId, setEditRoomId] = useState<number | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = async (page: number, perPage: number) => {
     try {
-      const rooms = await getRooms();
-      setData(rooms);
+      const response = await getRooms(page, perPage);
+      setData(response.data);
+      setTotalPages(response.totalPages);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -58,7 +155,7 @@ export function Rooms({ className }: { className?: string }) {
 
   const fetchCategories = async () => {
     setIsLoadingCategories(true);
-    setCategoriesError('');
+    setCategoriesError("");
     try {
       const categoriesData = await getCategories();
       if (Array.isArray(categoriesData)) {
@@ -68,7 +165,9 @@ export function Rooms({ className }: { className?: string }) {
       }
     } catch (err) {
       console.error("Error fetching categories:", err);
-      setCategoriesError(err instanceof Error ? err.message : 'Gagal memuat kategori');
+      setCategoriesError(
+        err instanceof Error ? err.message : "Gagal memuat kategori"
+      );
     } finally {
       setIsLoadingCategories(false);
     }
@@ -76,11 +175,10 @@ export function Rooms({ className }: { className?: string }) {
 
   useEffect(() => {
     const initializeData = async () => {
-      await fetchData();
-      await fetchCategories();
+      await Promise.all([fetchData(currentPage, itemsPerPage), fetchCategories()]);
     };
     initializeData();
-  }, []);
+  }, [currentPage, itemsPerPage]);
 
   const handleOpenModal = async () => {
     if (categories.length === 0) {
@@ -94,14 +192,13 @@ export function Rooms({ className }: { className?: string }) {
       if (categories.length === 0) {
         await fetchCategories();
       }
-      
       const room = await getRoom(id);
       setFormData({
         name: room.name,
         categoryId: room.categoryId.toString(),
         price: room.price.toString(),
         capacity: room.capacity.toString(),
-        description: room.description
+        description: room.description,
       });
       setEditRoomId(id);
       setIsModalOpen(true);
@@ -115,10 +212,15 @@ export function Rooms({ className }: { className?: string }) {
     if (confirm("Apakah Anda yakin ingin menghapus ruangan ini?")) {
       try {
         await deleteRoom(id);
-        await fetchData();
+        toast.success("Ruangan berhasil dihapus");
+        await fetchData(currentPage, itemsPerPage);
       } catch (error) {
         console.error("Error deleting room:", error);
-        setError(`Gagal menghapus ruangan: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        toast.error(
+          `Gagal menghapus ruangan: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
       }
     }
   };
@@ -126,28 +228,35 @@ export function Rooms({ className }: { className?: string }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    setError('');
+    setError("");
 
     try {
       const roomData = {
         name: formData.name,
-        categoryId: formData.categoryId, // Tidak perlu konversi ke Number
+        categoryId: Number(formData.categoryId),
         price: Number(formData.price),
         capacity: Number(formData.capacity),
-        description: formData.description
+        description: formData.description,
       };
 
-      // if (editRoomId) {
-      //   await updateRoom(editRoomId, roomData);
-      // } else {
-      //   await createRoom(roomData);
-      // }
+      if (editRoomId) {
+        await updateRoom(editRoomId, roomData);
+        toast.success("Ruangan berhasil diperbarui");
+      } else {
+        await createRoom(roomData);
+        toast.success("Ruangan berhasil ditambahkan");
+      }
 
-      await fetchData();
+      await fetchData(currentPage, itemsPerPage);
       setIsModalOpen(false);
       resetForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan ruangan');
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat menyimpan ruangan";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -155,48 +264,95 @@ export function Rooms({ className }: { className?: string }) {
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      categoryId: '',
-      price: '',
-      capacity: '',
-      description: ''
+      name: "",
+      categoryId: "",
+      price: "",
+      capacity: "",
+      description: "",
     });
     setEditRoomId(null);
+    setError("");
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newItemsPerPage = Number(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
+
+  const getPaginationItems = () => {
+    const items = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      items.push(
+        <button
+          key={i}
+          onClick={() => handlePageChange(i)}
+          className={cn(
+            "px-4 py-2 rounded-md transition-colors",
+            currentPage === i
+              ? "bg-blue-600 text-white dark:bg-blue-500"
+              : "bg-gray-100 text-dark hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+          )}
+        >
+          {i}
+        </button>
+      );
+    }
+
+    return items;
   };
 
   if (error) {
     return (
-      <div className={cn("p-4 rounded-[10px] bg-red-100 text-red-700", className)}>
-        {error}
-      </div>
+      <CustomAlert
+        type="danger"
+        message={error}
+        onClose={() => setError("")}
+      />
     );
   }
 
   if (loading) {
     return (
-      <div className={cn(
-        "grid rounded-[10px] bg-white px-7.5 pb-4 pt-7.5 shadow-1 dark:bg-gray-dark dark:shadow-card",
-        className
-      )}>
+      <div
+        className={cn(
+          "grid rounded-[10px] bg-white px-7.5 pb-4 pt-7.5 shadow-1 dark:bg-gray-dark dark:shadow-card",
+          className
+        )}
+      >
         <h2 className="mb-4 text-body-2xlg font-bold text-dark dark:text-white">
           Daftar Ruangan
         </h2>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nama</TableHead>
-              <TableHead>Kategori</TableHead>
-              <TableHead>Harga</TableHead>
-              <TableHead>Kapasitas</TableHead>
-              <TableHead>Deskripsi</TableHead>
-              <TableHead>Aksi</TableHead>
+              <TableHead className="text-dark dark:text-white">Nama</TableHead>
+              <TableHead className="text-dark dark:text-white">Kategori</TableHead>
+              <TableHead className="text-dark dark:text-white">Harga</TableHead>
+              <TableHead className="text-dark dark:text-white">Kapasitas</TableHead>
+              <TableHead className="text-dark dark:text-white">Deskripsi</TableHead>
+              <TableHead className="text-dark dark:text-white">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {Array.from({ length: 5 }).map((_, i) => (
               <TableRow key={i}>
                 <TableCell colSpan={6}>
-                  <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-8 bg-gray-200 rounded animate-pulse dark:bg-gray-600" />
                 </TableCell>
               </TableRow>
             ))}
@@ -207,27 +363,115 @@ export function Rooms({ className }: { className?: string }) {
   }
 
   return (
-    <div className={cn(
-      "grid rounded-[10px] bg-white px-7.5 pb-4 pt-7.5 shadow-1 dark:bg-gray-dark dark:shadow-card",
-      className
-    )}>
+    <div
+      className={cn(
+        "grid rounded-[10px] bg-white px-7.5 pb-4 pt-7.5 shadow-1 dark:bg-gray-dark dark:shadow-card",
+        className
+      )}
+    >
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-body-2xlg font-bold text-dark dark:text-white">
           Daftar Ruangan
         </h2>
         <button
           onClick={handleOpenModal}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600"
         >
           Tambah Ruangan
         </button>
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-dark dark:text-white">Nama</TableHead>
+            <TableHead className="text-dark dark:text-white">Kategori</TableHead>
+            <TableHead className="text-dark dark:text-white">Harga</TableHead>
+            <TableHead className="text-dark dark:text-white">Kapasitas</TableHead>
+            <TableHead className="text-dark dark:text-white">Deskripsi</TableHead>
+            <TableHead className="text-dark dark:text-white">Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.map((room) => (
+            <TableRow key={room.id}>
+              <TableCell className="text-dark dark:text-white">{room.name}</TableCell>
+              <TableCell className="text-dark dark:text-white">
+                {categories.find((c) => c.id === room.categoryId)?.name || "Tidak ada kategori"}
+              </TableCell>
+              <TableCell className="text-dark dark:text-white">
+                Rp{room.price.toLocaleString("id-ID")}
+              </TableCell>
+              <TableCell className="text-dark dark:text-white">{room.capacity} orang</TableCell>
+              <TableCell className="text-dark dark:text-white">{room.description}</TableCell>
+              <TableCell className="space-x-2">
+                <button
+                  onClick={() => handleEdit(room.id)}
+                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(room.id)}
+                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900"
+                >
+                  Hapus
+                </button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      <div className="flex justify-between items-center mt-6">
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-dark dark:text-white">Tampilkan:</span>
+          <select
+            value={itemsPerPage}
+            onChange={handleItemsPerPageChange}
+            className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          >
+            {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((size) => (
+              <option key={size} value={size}>
+                {size} per halaman
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className={cn(
+              "px-4 py-2 rounded-md transition-colors",
+              currentPage === 1
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400"
+                : "bg-gray-100 text-dark hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+            )}
+          >
+            Sebelumnya
+          </button>
+          {getPaginationItems()}
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className={cn(
+              "px-4 py-2 rounded-md transition-colors",
+              currentPage === totalPages
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400"
+                : "bg-gray-100 text-dark hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+            )}
+          >
+            Selanjutnya
+          </button>
+        </div>
       </div>
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-md">
             <h3 className="text-lg font-bold mb-4 dark:text-white">
-              {editRoomId ? 'Edit Ruangan' : 'Tambah Ruangan Baru'}
+              {editRoomId ? "Edit Ruangan" : "Tambah Ruangan Baru"}
             </h3>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
@@ -309,7 +553,9 @@ export function Rooms({ className }: { className?: string }) {
                 </div>
               </div>
 
-              {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
+              {error && (
+                <p className="text-red-500 dark:text-red-400 text-sm mt-4">{error}</p>
+              )}
 
               <div className="flex justify-end gap-2 mt-6">
                 <button
@@ -325,56 +571,16 @@ export function Rooms({ className }: { className?: string }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
                   disabled={submitting}
                 >
-                  {submitting ? 'Menyimpan...' : 'Simpan'}
+                  {submitting ? "Menyimpan..." : "Simpan"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nama</TableHead>
-            <TableHead>Kategori</TableHead>
-            <TableHead>Harga</TableHead>
-            <TableHead>Kapasitas</TableHead>
-            <TableHead>Deskripsi</TableHead>
-            <TableHead>Aksi</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((room) => (
-            <TableRow key={room.id}>
-              <TableCell>{room.name}</TableCell>
-              <TableCell>
-                {categories.find(c => c.id === Number(room.categoryId))?.name || 'Memuat...'}
-              </TableCell>
-              <TableCell>Rp{room.price.toLocaleString("id-ID")}</TableCell>
-              <TableCell>{room.capacity} orang</TableCell>
-              <TableCell>{room.description}</TableCell>
-              <TableCell className="space-x-2">
-                <button
-                  onClick={() => handleEdit(room.id)}
-                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 px-2 py-1 rounded hover:bg-blue-50"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(room.id)}
-                  className="text-red-600 hover:text-red-800 dark:text-red-400 px-2 py-1 rounded hover:bg-red-50"
-                >
-                  Hapus
-                </button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
     </div>
   );
 }
