@@ -1,67 +1,79 @@
 "use client";
 import { EmailIcon, PasswordIcon } from "@/assets/icons";
-import Link from "next/link";
 import React, { useState } from "react";
 import InputGroup from "../FormElements/InputGroup";
-import { Checkbox } from "../FormElements/checkbox";
 import { useRouter } from 'next/navigation';
 
-export default function SigninWithPassword() {
+export default function RegisterWithPassword() {
   const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState(''); // Ganti username menjadi email untuk kejelasan
   const [password, setPassword] = useState('');
-  const [password_confirmation, setPassword_confirmation] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsLoading(true);
-  setError('');
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
 
-  try {
-    const response = await fetch('https://simaru.amisbudi.cloud/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        "name": name,
-        "email": username,
-        "password": password,
-        "password_confirmation": password_confirmation
-      }),
-    });
+    try {
+      // 1. Kirim permintaan registrasi ke API
+      const response = await fetch('https://simaru.amisbudi.cloud/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          password_confirmation: passwordConfirmation
+        }),
+      });
 
-    const data = await response.json();
-    console.log('Respons Data:', data);  // Cek apa yang dikirim oleh API
+      const data = await response.json();
+      console.log('Respons Data:', data); // Untuk debugging
 
-    if (response.ok) {
-      if (data?.user && data?.accessToken) {
-        const userData = {
-          name: data.user?.name || 'User',
-          email: data.user?.email || username
-        };
+      if (response.ok) {
+        if (data?.accessToken) {
+          // Simpan token akses
+          localStorage.setItem('accessToken', data.accessToken);
 
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('accessToken', data.accessToken);
+          // 2. Ambil profil pengguna
+          const profileRes = await fetch('https://simaru.amisbudi.cloud/api/auth/me', {
+            headers: { 'Authorization': `Bearer ${data.accessToken}` },
+          });
+          const profileData = await profileRes.json();
 
-        router.push('/');
+          if (profileRes.ok) {
+            // Simpan data pengguna ke localStorage
+            localStorage.setItem('user', JSON.stringify({
+              name: profileData.name,
+              email: profileData.email,
+              id: profileData.id // Jika tersedia
+            }));
+
+            // 3. Arahkan ke dashboard
+            router.push('/');
+          } else {
+            setError('Gagal mengambil data pengguna.');
+          }
+        } else {
+          setError('Token tidak ditemukan dalam respons.');
+        }
       } else {
-        setError('Data pengguna atau token tidak valid.');
+        setError(data.message || 'Registrasi gagal. Silakan coba lagi.');
       }
-    } else {
-      setError(data.message || 'Registrasi gagal. Silakan coba lagi.');
+    } catch (err) {
+      setError('Terjadi kesalahan. Silakan coba beberapa saat lagi.');
+    } finally {
+      setIsLoading(false);
     }
-  } catch (err) {
-    setError('Terjadi kesalahan. Silakan coba beberapa saat lagi.');
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   return (
     <form onSubmit={handleSubmit}>
+      {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
 
       <InputGroup
         label="Name"
@@ -79,8 +91,8 @@ export default function SigninWithPassword() {
         className="mb-4 [&_input]:py-[15px]"
         placeholder="Enter your email"
         name="email"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
         icon={<EmailIcon />}
         required
       />
@@ -101,30 +113,13 @@ export default function SigninWithPassword() {
         label="Password Confirmation"
         type="password"
         className="mb-5 [&_input]:py-[15px]"
-        placeholder="Enter your password Confirmation"
+        placeholder="Enter your password confirmation"
         name="password_confirmation"
-        value={password_confirmation}
-        onChange={(e) => setPassword_confirmation(e.target.value)}
+        value={passwordConfirmation}
+        onChange={(e) => setPasswordConfirmation(e.target.value)}
         icon={<PasswordIcon />}
         required
       />
-
-      <div className="mb-6 flex items-center justify-between gap-2 py-2 font-medium">
-        <Checkbox
-          label="Remember me"
-          name="remember"
-          withIcon="check"
-          minimal
-          radius="md"
-        />
-
-        <Link
-          href="/auth/forgot-password"
-          className="hover:text-primary dark:text-white dark:hover:text-primary"
-        >
-          Forgot Password?
-        </Link>
-      </div>
 
       <div className="mb-4.5">
         <button
@@ -132,7 +127,7 @@ export default function SigninWithPassword() {
           disabled={isLoading}
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary p-4 font-medium text-white transition hover:bg-opacity-90"
         >
-          {isLoading ? 'Logging in...' : 'Login'}
+          {isLoading ? 'Registering...' : 'Register'}
         </button>
       </div>
     </form>

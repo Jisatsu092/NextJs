@@ -126,19 +126,21 @@ export function Rooms({ className }: { className?: string }) {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    categoryId: "",
-    price: "",
-    capacity: "",
-    description: "",
-  });
-  const [submitting, setSubmitting] = useState(false);
+  const [isEdit, setIsEdit] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [message, setMessage] = useState("");
+  const [roomName, setRoomName] = useState("");
+  const [name, setName] = useState("");
+  const [categoryId, setCategoryId] = useState(0);
+  const [price, setPrice] = useState(0);
+  const [capacity, setCapacity] = useState(0);
+  const [description, setDescription] = useState("");
+  const [roomId, setRoomId] = useState(0);
   const [error, setError] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [categoriesError, setCategoriesError] = useState("");
-  const [editRoomId, setEditRoomId] = useState<number | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const fetchData = async (page: number, perPage: number) => {
     try {
@@ -185,22 +187,22 @@ export function Rooms({ className }: { className?: string }) {
       await fetchCategories();
     }
     setIsModalOpen(true);
+    setIsEdit(false);
+    resetForm();
   };
 
-  const handleEdit = async (id: number) => {
+  const handleEdit = async (room: Room) => {
     try {
       if (categories.length === 0) {
         await fetchCategories();
       }
-      const room = await getRoom(id);
-      setFormData({
-        name: room.name,
-        categoryId: room.categoryId.toString(),
-        price: room.price.toString(),
-        capacity: room.capacity.toString(),
-        description: room.description,
-      });
-      setEditRoomId(id);
+      setRoomId(room.id);
+      setName(room.name);
+      setCategoryId(room.categoryId);
+      setPrice(room.price);
+      setCapacity(room.capacity);
+      setDescription(room.description);
+      setIsEdit(true);
       setIsModalOpen(true);
     } catch (error) {
       console.error("Error fetching room data:", error);
@@ -227,28 +229,38 @@ export function Rooms({ className }: { className?: string }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
     setError("");
 
+    if (!name || !categoryId || !price || !capacity || !description) {
+      setError("Semua field harus diisi");
+      toast.error("Semua field harus diisi");
+      return;
+    }
+
     try {
+      setIsLoadingCategories(true);
       const roomData = {
-        name: formData.name,
-        categoryId: Number(formData.categoryId),
-        price: Number(formData.price),
-        capacity: Number(formData.capacity),
-        description: formData.description,
+        name,
+        categoryId,
+        price,
+        capacity,
+        description,
       };
 
-      if (editRoomId) {
-        await updateRoom(editRoomId, roomData);
-        toast.success("Ruangan berhasil diperbarui");
+      if (isEdit) {
+        const response = await updateRoom(roomId, roomData);
+        setMessage(response.message || "Ruangan berhasil diperbarui");
+        setRoomName(roomData.name);
       } else {
-        await createRoom(roomData);
-        toast.success("Ruangan berhasil ditambahkan");
+        const response = await createRoom(roomData);
+        setMessage(response.message || "Ruangan berhasil ditambahkan");
+        setRoomName(roomData.name);
       }
 
-      await fetchData(currentPage, itemsPerPage);
+      setIsSuccess(true);
       setIsModalOpen(false);
+      setTimeout(() => setIsSuccess(false), 3000);
+      await fetchData(currentPage, itemsPerPage);
       resetForm();
     } catch (err) {
       const errorMessage =
@@ -258,20 +270,19 @@ export function Rooms({ className }: { className?: string }) {
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
-      setSubmitting(false);
+      setIsLoadingCategories(false);
     }
   };
 
   const resetForm = () => {
-    setFormData({
-      name: "",
-      categoryId: "",
-      price: "",
-      capacity: "",
-      description: "",
-    });
-    setEditRoomId(null);
+    setName("");
+    setCategoryId(0);
+    setPrice(0);
+    setCapacity(0);
+    setDescription("");
+    setRoomId(0);
     setError("");
+    setIsEdit(false);
   };
 
   const handlePageChange = (page: number) => {
@@ -315,6 +326,14 @@ export function Rooms({ className }: { className?: string }) {
 
     return items;
   };
+
+  const sortedData = [...data].sort((a, b) => {
+    const nameA = a.name || '';
+    const nameB = b.name || '';
+    return sortOrder === 'asc'
+      ? nameA.localeCompare(nameB)
+      : nameB.localeCompare(nameA);
+  });
 
   if (error) {
     return (
@@ -369,6 +388,31 @@ export function Rooms({ className }: { className?: string }) {
         className
       )}
     >
+      {isSuccess && (
+        <div role="alert" className="rounded-md border border-gray-300 bg-white p-4 shadow-sm mb-4">
+          <div className="flex items-start gap-4">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6 text-green-600">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <strong className="font-medium text-gray-900">{message}</strong>
+              <p className="mt-0.5 text-sm text-gray-700">Your data {roomName} have been saved.</p>
+            </div>
+            <button
+              className="-m-3 rounded-full p-1.5 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+              type="button"
+              onClick={() => setIsSuccess(false)}
+              aria-label="Dismiss alert"
+            >
+              <span className="sr-only">Dismiss popup</span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-body-2xlg font-bold text-dark dark:text-white">
           Daftar Ruangan
@@ -384,7 +428,12 @@ export function Rooms({ className }: { className?: string }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="text-dark dark:text-white">Nama</TableHead>
+            <TableHead
+              className="text-dark dark:text-white cursor-pointer"
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            >
+              Nama {sortOrder === 'asc' ? '↑' : '↓'}
+            </TableHead>
             <TableHead className="text-dark dark:text-white">Kategori</TableHead>
             <TableHead className="text-dark dark:text-white">Harga</TableHead>
             <TableHead className="text-dark dark:text-white">Kapasitas</TableHead>
@@ -393,7 +442,7 @@ export function Rooms({ className }: { className?: string }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((room) => (
+          {sortedData.map((room) => (
             <TableRow key={room.id}>
               <TableCell className="text-dark dark:text-white">{room.name}</TableCell>
               <TableCell className="text-dark dark:text-white">
@@ -406,7 +455,7 @@ export function Rooms({ className }: { className?: string }) {
               <TableCell className="text-dark dark:text-white">{room.description}</TableCell>
               <TableCell className="space-x-2">
                 <button
-                  onClick={() => handleEdit(room.id)}
+                  onClick={() => handleEdit(room)}
                   className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900"
                 >
                   Edit
@@ -469,94 +518,113 @@ export function Rooms({ className }: { className?: string }) {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4 dark:text-white">
-              {editRoomId ? "Edit Ruangan" : "Tambah Ruangan Baru"}
-            </h3>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-                    Nama Ruangan
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          <div className="bg-white dark:bg-gray-700 p-6 rounded-lg w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold dark:text-white">
+                {isEdit ? "Edit Ruangan" : "Tambah Ruangan Baru"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsModalOpen(false);
+                  resetForm();
+                }}
+                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
+              >
+                <svg
+                  className="w-3 h-3"
+                  aria-hidden="true"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 14 14"
+                >
+                  <path
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-                    Kategori
-                  </label>
-                  <select
-                    required
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    value={formData.categoryId}
-                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                    disabled={isLoadingCategories}
-                  >
-                    <option value="">Pilih Kategori</option>
-                    {isLoadingCategories ? (
-                      <option>Memuat kategori...</option>
-                    ) : categoriesError ? (
-                      <option className="text-red-500">{categoriesError}</option>
-                    ) : (
-                      categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-                    Harga
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-                    Kapasitas
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1 dark:text-gray-200">
-                    Deskripsi
-                  </label>
-                  <textarea
-                    required
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
+                </svg>
+                <span className="sr-only">Close modal</span>
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-200">
+                  Nama Ruangan
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
               </div>
-
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-200">
+                  Kategori
+                </label>
+                <select
+                  required
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(Number(e.target.value))}
+                  disabled={isLoadingCategories}
+                >
+                  <option value="">Pilih Kategori</option>
+                  {isLoadingCategories ? (
+                    <option>Memuat kategori...</option>
+                  ) : categoriesError ? (
+                    <option className="text-red-500">{categoriesError}</option>
+                  ) : (
+                    categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-200">
+                  Harga
+                </label>
+                <input
+                  type="number"
+                  required
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  value={price}
+                  onChange={(e) => setPrice(Number(e.target.value))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-200">
+                  Kapasitas
+                </label>
+                <input
+                  type="number"
+                  required
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  value={capacity}
+                  onChange={(e) => setCapacity(Number(e.target.value))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-200">
+                  Deskripsi
+                </label>
+                <textarea
+                  required
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
               {error && (
                 <p className="text-red-500 dark:text-red-400 text-sm mt-4">{error}</p>
               )}
-
               <div className="flex justify-end gap-2 mt-6">
                 <button
                   type="button"
@@ -565,16 +633,15 @@ export function Rooms({ className }: { className?: string }) {
                     resetForm();
                   }}
                   className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-white"
-                  disabled={submitting}
                 >
-                  Batal
+                  Kembali
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
-                  disabled={submitting}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 disabled:opacity-50"
+                  disabled={isLoadingCategories}
                 >
-                  {submitting ? "Menyimpan..." : "Simpan"}
+                  {isLoadingCategories ? "Menyimpan..." : "Simpan"}
                 </button>
               </div>
             </form>

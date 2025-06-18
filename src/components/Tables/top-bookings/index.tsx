@@ -54,6 +54,7 @@ export function Bookings({ className }: { className?: string }) {
     roomId: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const getAccessToken = useCallback(() => {
     const token = localStorage.getItem("accessToken");
@@ -195,6 +196,16 @@ export function Bookings({ className }: { className?: string }) {
     }
   };
 
+  const sortedData = [...data].sort((a, b) => {
+    const nameA = a.room?.name || '';
+    const nameB = b.room?.name || '';
+    if (sortOrder === 'asc') {
+      return nameA.localeCompare(nameB);
+    } else {
+      return nameB.localeCompare(nameA);
+    }
+  });
+
   if (loading) {
     return (
       <div
@@ -267,12 +278,17 @@ export function Bookings({ className }: { className?: string }) {
         <TableHeader>
           <TableRow>
             <TableHead className="text-dark dark:text-white">Tanggal</TableHead>
-            <TableHead className="text-dark dark:text-white">Ruangan</TableHead>
+            <TableHead
+              className="text-dark dark:text-white cursor-pointer"
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            >
+              Ruangan {sortOrder === 'asc' ? '↑' : '↓'}
+            </TableHead>
             <TableHead className="text-dark dark:text-white">Aksi</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((b) => (
+          {sortedData.map((b) => (
             <TableRow key={b.id}>
               <TableCell className="text-dark dark:text-white">
                 {new Date(b.bookingDate).toISOString().split("T")[0]}
